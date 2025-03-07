@@ -1,0 +1,8 @@
+[tool.poetry]
+name = "leafscan-ai"
+version = "0.1.0"
+description = "A leaf disease detection app."
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "3.9.18"
