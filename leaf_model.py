@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import tensorflow as tf
-import efficientnet.tfkeras as efn
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.models import Model
@@ -25,22 +24,6 @@ else:
 # Data directories
 train_dir = r"D:\Leaf classifier\data\train"
 valid_dir = r"D:\Leaf classifier\data\valid"
-
-# Debug: Check if paths exist
-print(f"Train directory exists: {os.path.exists(train_dir)}")
-print(f"Valid directory exists: {os.path.exists(valid_dir)}")
-
-# Debug: List files in the train directory
-if os.path.exists(train_dir):
-    print("Train directory contents:", os.listdir(train_dir))
-else:
-    print("Train directory not found.")
-
-# Debug: List files in the valid directory
-if os.path.exists(valid_dir):
-    print("Valid directory contents:", os.listdir(valid_dir))
-else:
-    print("Valid directory not found.")
 
 # Data augmentation
 train_datagen = ImageDataGenerator(
@@ -83,29 +66,37 @@ class_weights = compute_class_weight('balanced', classes=np.unique(train_labels)
 class_weights_dict = dict(enumerate(class_weights))
 print("Class weights:", class_weights_dict)
 
-# Load EfficientNet-B3 with Fine-Tuning
-base_model = efn.EfficientNetB3(weights='imagenet', include_top=False)
+# Register the FixedDropout layer
+class FixedDropout(tf.keras.layers.Dropout):
+    def __init__(self, rate, **kwargs):
+        super().__init__(rate, **kwargs)
+        self.rate = rate
 
-# Freeze base layers
-for layer in base_model.layers[:-50]:
+    def get_config(self):
+        config = super().get_config()
+        config.update({"rate": self.rate})
+        return config
+
+# Load the existing model
+MODEL_PATH = r"D:\Leaf classifier\improvedd_leaf_classifier.keras"
+base_model = tf.keras.models.load_model(
+    MODEL_PATH,
+    custom_objects={'FixedDropout': FixedDropout}
+)
+
+# Freeze all layers except the last few
+for layer in base_model.layers[:-10]:  # Unfreeze the last 10 layers
     layer.trainable = False
 
-# Unfreeze top layers
-for layer in base_model.layers[-50:]:
-    layer.trainable = True
+# Update the final layer for the new number of classes
+x = base_model.layers[-2].output  # Get the second-to-last layer
+predictions = Dense(train_generator.num_classes, activation='softmax')(x)  # New output layer
 
-# Add custom layers
-x = base_model.output
-x = GlobalAveragePooling2D()(x)
-x = Dense(512, activation='relu')(x)
-x = Dropout(0.5)(x)
-predictions = Dense(train_generator.num_classes, activation='softmax')(x)
-
-# Combine the model
+# Create the new model
 model = Model(inputs=base_model.input, outputs=predictions)
 
 # Compile the model
-optimizer = Adam(learning_rate=1e-4)
+optimizer = Adam(learning_rate=1e-5)  # Use a lower learning rate for fine-tuning
 model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
 
 # Callbacks
@@ -118,11 +109,11 @@ history = model.fit(
     steps_per_epoch=train_generator.samples // train_generator.batch_size,
     validation_data=valid_generator,
     validation_steps=valid_generator.samples // valid_generator.batch_size,
-    epochs=50,
+    epochs=20,  # Fewer epochs for fine-tuning
     callbacks=[early_stopping, reduce_lr],
     class_weight=class_weights_dict
 )
 
-# Save the model
-model.save(r"D:\Leaf classifier\improvedd_leaf_classifier.keras")
+# Save the updated model
+model.save(r"D:\Leaf classifier\improvedd_leaf_classifier_with_grapes.keras")
 print("Model saved successfully!")
