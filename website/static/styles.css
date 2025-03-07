@@ -1,0 +1,25 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 20px;
+}
+
+h1 {
+    color: #4CAF50;
+}
+
+#upload-form {
+    margin: 20px 0;
+}
+
+#result {
+    margin-top: 20px;
+}
+
+#output-image {
+    max-width: 100%;
+    height: auto;
+    margin-top: 20px;
+    border: 2px solid #4CAF50;
+    border-radius: 10px;
+}
